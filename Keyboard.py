@@ -5,14 +5,12 @@ from cvzone.HandTrackingModule import HandDetector
 from time import sleep
 from pynput.keyboard import Controller, Key
 import mediapipe as mp
-from ctypes import cast, POINTER
-from comtypes import CLSCTX_ALL
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 
 from threading import Thread
 from queue import Queue
 import random
 import time
+import util
 
 size = 1
 q = Queue(size)
@@ -23,15 +21,6 @@ cap.set(4, 720)
 
 detector = HandDetector(detectionCon=0.8)
 
-# 控制设备音响硬件
-devices = AudioUtilities.GetSpeakers()
-interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-volume = cast(interface, POINTER(IAudioEndpointVolume))
-# volume.GetMute()
-# print(volume.GetMasterVolumeLevel())
-# 音量范围
-volRan = volume.GetVolumeRange()
-volume.SetMasterVolumeLevel(-1.0, None)
 
 keys = [["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "<--"],
         ["A", "S", "D", "F", "G", "H", "J", "K", "L", ";", "UP"],
@@ -47,7 +36,8 @@ def drawAll(img, buttonList):
         x, y = button.pos
 
         w, h = button.size
-        cv2.rectangle(img, button.pos, (x + w, y + h), (255, 0, 0), cv2.FILLED)  # start, size, color
+        cv2.rectangle(img, button.pos, (x + w, y + h),
+                      (255, 0, 0), cv2.FILLED)  # start, size, color
         cv2.putText(img, button.text, (x + 20, y + 65),
                     cv2.FONT_HERSHEY_PLAIN, 4, (255, 255, 255), 4)  # text, location, font, proportion, color, thickness
 
@@ -65,73 +55,76 @@ buttonList = []
 for i in range(len(keys)):
     for j, key in enumerate(keys[i]):
         if key == '<--':
-            buttonList.append(Button([100 * j + 50, 100 * i + 50], key, (85 * 2, 85)))
+            buttonList.append(
+                Button([100 * j + 50, 100 * i + 50], key, (85 * 2, 85)))
         if key == 'UP':
-            buttonList.append(Button([100 * j + 50, 100 * i + 50], key, (85 * 2, 85)))
+            buttonList.append(
+                Button([100 * j + 50, 100 * i + 50], key, (85 * 2, 85)))
 
         if key == 'DOWN':
-            buttonList.append(Button([100 * j + 50, 100 * i + 50], key, (85 * 3, 85)))
+            buttonList.append(
+                Button([100 * j + 50, 100 * i + 50], key, (85 * 3, 85)))
 
         buttonList.append(Button([100 * j + 50, 100 * i + 50], key, (85, 85)))
 
-while True:
-    success, img = cap.read()
-    img = cv2.flip(img, 1)
-    img = detector.findHands(img)
-    lmList, bboxInfo = detector.findPosition(img)
 
-    drawAll(img, buttonList)
+def run():
 
-    # 判断手指是否在按钮上
-    if lmList:
-        for button in buttonList:
-            x, y = button.pos
-            w, h = button.size
-            # 8号为右手食指指尖
-            if x < lmList[8][0] < x + w and y < lmList[8][1] < y + h:
-                cv2.rectangle(img, button.pos, (x + w, y + h), (160, 160, 160), cv2.FILLED)  # start, size, color
-                cv2.putText(img, button.text, (x + 20, y + 65),
-                            cv2.FONT_HERSHEY_PLAIN, 4, (255, 255, 255),
-                            4)  # text, location, font, proportion, color, thickness
+    while True:
+        success, img = cap.read()
+        img = cv2.flip(img, 1)
+        img = detector.findHands(img)
+        lmList, bboxInfo = detector.findPosition(img)
 
-                # 食指指尖和中指指尖的距离
-                l, _, _ = detector.findDistance(8, 12, img, draw=False)
-                print(l)
+        drawAll(img, buttonList)
 
-                # 当点击的时候
-                if l < 30:
-                    cv2.rectangle(img, button.pos, (x + w, y + h), (255, 178, 102), cv2.FILLED)  # start, size, color
+        # 判断手指是否在按钮上
+        if lmList:
+            for button in buttonList:
+                x, y = button.pos
+                w, h = button.size
+                # 8号为右手食指指尖
+                if x < lmList[8][0] < x + w and y < lmList[8][1] < y + h:
+                    cv2.rectangle(img, button.pos, (x + w, y + h),
+                                  (160, 160, 160), cv2.FILLED)  # start, size, color
                     cv2.putText(img, button.text, (x + 20, y + 65),
                                 cv2.FONT_HERSHEY_PLAIN, 4, (255, 255, 255),
-                                4)
-                    if button.text == '<--':
-                        Keyboard.press(Key.backspace)
-                        finalText = finalText[:-1]
+                                4)  # text, location, font, proportion, color, thickness
 
-                    if button.text == 'UP':
-                        # 当前音量
-                        vol = volume.GetMasterVolumeLevel()
+                    # 食指指尖和中指指尖的距离
+                    l, _, _ = detector.findDistance(8, 12, img, draw=False)
+                    print(l)
 
-                        volume.SetMasterVolumeLevel(vol + 1, None)
+                    # 当点击的时候
+                    if l < 30:
+                        # start, size, color
+                        cv2.rectangle(img, button.pos, (x + w, y + h),
+                                      (255, 178, 102), cv2.FILLED)
+                        cv2.putText(img, button.text, (x + 20, y + 65),
+                                    cv2.FONT_HERSHEY_PLAIN, 4, (255, 255, 255),
+                                    4)
+                        if button.text == '<--':
+                            Keyboard.press(Key.backspace)
+                            finalText = finalText[:-1]
 
-                    if button.text == 'DOWN':
-                        vol = volume.GetMasterVolumeLevel()
+                        if button.text == 'UP':
+                            # 当前音量
+                            util.increaseVolume()
 
-                        volume.SetMasterVolumeLevel(vol - 1, None)
+                        if button.text == 'DOWN':
+                            util.decreaseVolume()
 
+                        else:
+                            finalText += button.text
+                            Keyboard.press(button.text)
+                # 可更改
+                sleep(0.15)
 
-                    else:
-                        finalText += button.text
-                        Keyboard.press(button.text)
-            # 可更改
-            sleep(0.15)
+        # 绘制文本框
+        cv2.rectangle(img, (50, 350), (700, 450), (160, 160, 160),
+                      cv2.FILLED)  # start, size, color
+        cv2.putText(img, finalText, (60, 425),
+                    cv2.FONT_HERSHEY_PLAIN, 4, (255, 255, 255), 4)
 
-    # 绘制文本框
-    cv2.rectangle(img, (50, 350), (700, 450), (160, 160, 160), cv2.FILLED)  # start, size, color
-    cv2.putText(img, finalText, (60, 425), cv2.FONT_HERSHEY_PLAIN, 4, (255, 255, 255), 4)
-
-    cv2.imshow("image", img)
-    cv2.waitKey(1)
-
-# class ProducerThread(Thread):
-# def __int__(self,name=None):
+        cv2.imshow("image", img)
+        cv2.waitKey(1)
