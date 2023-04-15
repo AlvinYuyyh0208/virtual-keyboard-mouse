@@ -35,6 +35,7 @@ def move_consumer(array: Array):
 
 
 def run():
+    global plocX, plocY, clocX, clocY, pTime
     array = Array('f', [0, 0])
     p = Process(target=move_consumer, args=(array,))
     p.start()
