@@ -3,6 +3,7 @@ import numpy as np
 import cvzone.HandTrackingModule as htm
 import time
 import autopy
+from multiprocessing import Process, Array
 
 # 在检测出手之前有卡顿的情况
 cap = cv2.VideoCapture(0)
@@ -27,8 +28,16 @@ plocX, plocY = 0, 0
 # current location
 clocX, clocY = 0, 0
 
+def move_consumer(array: Array):
+    while True:
+        autopy.mouse.move(array[0], array[1])
+        time.sleep(0.01)
+
 
 def run():
+    array = Array('f', [0, 0])
+    p = Process(target=move_consumer, args=(array,))
+    p.start()
     while True:
         success, img = cap.read()
         img = cv2.flip(img, 1)
@@ -55,7 +64,8 @@ def run():
                 clocX = plocX + (x3 - plocX) / smoothening
                 clocY = plocY + (y3 - plocY) / smoothening
 
-                autopy.mouse.move(clocX, clocY)
+                # autopy.mouse.move(clocX, clocY)
+                array[0], array[1] = clocX, clocY
                 cv2.circle(img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
 
                 plocX, plocY = clocX, clocY
@@ -84,3 +94,6 @@ def run():
 
         cv2.imshow("image", img)
         cv2.waitKey(1)
+
+if __name__ == '__main__':
+    run()
